@@ -1,0 +1,59 @@
+name: Compilar ConceptMap AI para Windows, Linux y macOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Compilar en ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rust-target: ''
+          - os: ubuntu-22.04
+            rust-target: ''
+          - os: macos-latest
+            rust-target: ''
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Instalar dependencias de Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: Instalar Rust estable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Guardar caché de compilación Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Instalar paquetes de JavaScript
+        run: npm install
+
+      - name: Compilar y empaquetar la aplicación
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: npm run tauri
+          args: ''
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: 'ConceptMap-AI-[platform]-[arch]-[bundle]'
